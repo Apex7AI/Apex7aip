@@ -1,8 +1,32 @@
 services:
   agent-zero:
+    image: frdel/agent-zero-run:latest
     container_name: agent-zero
-    image: frdel/agent-zero:latest
-    volumes:
-      - ./agent-zero:/a0
     ports:
-      - "50080:80"
+      - "50001:80"
+    volumes:
+      - ../../python:/a0/python
+      - ../../webui:/a0/webui
+      - ../../run_ui.py:/a0/run_ui.py
+      - ../../prepare.py:/a0/prepare.py
+      - ../../models.py:/a0/models.py
+      - ../../preload.py:/a0/preload.py
+      - ../../initialize.py:/a0/initialize.py
+      - ../../agent.py:/a0/agent.py
+      - ../../lib:/a0/lib
+      - ./fs/etc/supervisor/conf.d/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+
+      # Mount persistent data directories
+      - ../../memory:/a0/memory
+      - ../../knowledge:/a0/knowledge
+      - ../../instruments:/a0/instruments
+      - ../../prompts:/a0/prompts
+      - ../../work_dir:/a0/work_dir
+      - ../../tmp:/a0/tmp
+    restart: unless-stopped
+    environment:
+      - TZ=UTC
+    working_dir: /a0
+    tty: true
+    env_file:
+      - ../../.env

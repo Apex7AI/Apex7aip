@@ -48,10 +48,12 @@ def has_arg(name: str):
     return name in args
 
 def is_dockerized() -> bool:
-    return get_arg("dockerized")
+    return bool(get_arg("dockerized"))
 
 def is_development() -> bool:
-    return not is_dockerized()
+    # This is the "main circuit breaker". By forcing it to False, we disable all RFC calls
+    # and make the agent run in a self-contained, production-like mode.
+    return False
 
 def get_local_url():
     if is_dockerized():

@@ -15,12 +15,12 @@ from python.helpers import runtime, dotenv, process
 from python.helpers.extract_tools import load_classes_from_folder
 from python.helpers.api import ApiHandler
 from python.helpers.print_style import PrintStyle
+from python.helpers.settings import get_settings
 
-
-# Set the new timezone to 'UTC'
-os.environ["TZ"] = "UTC"
-# Apply the timezone change
-time.tzset()
+# Set the timezone
+os.environ['TZ'] = get_settings().get('TIMEZONE', 'UTC')
+if hasattr(time, 'tzset'):
+    time.tzset()
 
 # initialize the internal Flask server
 webapp = Flask("app", static_folder=get_abs_path("./webui"), static_url_path="/")
@@ -154,10 +154,8 @@ def run():
             pass  # Override to suppress request logging
 
     # Get configuration from environment
-    port = runtime.get_web_ui_port()
-    host = (
-        runtime.get_arg("host") or dotenv.get_dotenv_value("WEB_UI_HOST") or "localhost"
-    )
+    port = 80
+    host = "0.0.0.0"
     server = None
 
     def register_api_handler(app, handler: type[ApiHandler]):

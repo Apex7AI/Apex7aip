@@ -43,6 +43,8 @@ class Settings(TypedDict):
     browser_model_vision: bool
     browser_model_kwargs: dict[str, str]
 
+    search_engine_provider: str
+
     agent_prompts_subdir: str
     agent_memory_subdir: str
     agent_knowledge_subdir: str
@@ -214,10 +216,10 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     chat_model_section: SettingsSection = {
         "id": "chat_model",
-        "title": "Chat Model",
-        "description": "Selection and settings for main chat model used by Agent Zero",
+        "title": "Chat model",
+        "description": "The main model used by the agent for chat and task decomposition.",
         "fields": chat_model_fields,
-        "tab": "agent",
+        "tab": "models",
     }
 
     # main model section
@@ -285,9 +287,9 @@ def convert_out(settings: Settings) -> SettingsOutput:
     util_model_section: SettingsSection = {
         "id": "util_model",
         "title": "Utility model",
-        "description": "Smaller, cheaper, faster model for handling utility tasks like organizing memory, preparing prompts, summarizing.",
+        "description": "A smaller, faster model for simple tasks like summarization, renaming chats, etc. If 'None' is selected, the main chat model will be used instead.",
         "fields": util_model_fields,
-        "tab": "agent",
+        "tab": "models",
     }
 
     # embedding model section
@@ -344,10 +346,10 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     embed_model_section: SettingsSection = {
         "id": "embed_model",
-        "title": "Embedding Model",
-        "description": "Settings for the embedding model used by Agent Zero.",
+        "title": "Embedding model",
+        "description": "The model used for creating vector embeddings for documents and memories. If 'None' is selected, the main chat model will be used instead.",
         "fields": embed_model_fields,
-        "tab": "agent",
+        "tab": "models",
     }
 
     # embedding model section
@@ -394,109 +396,13 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     browser_model_section: SettingsSection = {
         "id": "browser_model",
-        "title": "Web Browser Model",
-        "description": "Settings for the web browser model. Agent Zero uses <a href='https://github.com/browser-use/browser-use' target='_blank'>browser-use</a> agentic framework to handle web interactions.",
+        "title": "Browser agent model",
+        "description": "Model used by the browser agent. If 'None' is selected, the main chat model will be used instead.",
         "fields": browser_model_fields,
-        "tab": "agent",
+        "tab": "models",
     }
 
-    # # Memory settings section
-    # memory_fields: list[SettingsField] = []
-    # memory_fields.append(
-    #     {
-    #         "id": "memory_settings",
-    #         "title": "Memory Settings",
-    #         "description": "<settings for memory>",
-    #         "type": "text",
-    #         "value": "",
-    #     }
-    # )
-
-    # memory_section: SettingsSection = {
-    #     "id": "memory",
-    #     "title": "Memory Settings",
-    #     "description": "<settings for memory management here>",
-    #     "fields": memory_fields,
-    # }
-
-    # basic auth section
-    auth_fields: list[SettingsField] = []
-
-    auth_fields.append(
-        {
-            "id": "auth_login",
-            "title": "UI Login",
-            "description": "Set user name for web UI",
-            "type": "text",
-            "value": dotenv.get_dotenv_value(dotenv.KEY_AUTH_LOGIN) or "",
-        }
-    )
-
-    auth_fields.append(
-        {
-            "id": "auth_password",
-            "title": "UI Password",
-            "description": "Set user password for web UI",
-            "type": "password",
-            "value": (
-                PASSWORD_PLACEHOLDER
-                if dotenv.get_dotenv_value(dotenv.KEY_AUTH_PASSWORD)
-                else ""
-            ),
-        }
-    )
-
-    if runtime.is_dockerized():
-        auth_fields.append(
-            {
-                "id": "root_password",
-                "title": "root Password",
-                "description": "Change linux root password in docker container. This password can be used for SSH access. Original password was randomly generated during setup.",
-                "type": "password",
-                "value": "",
-            }
-        )
-
-    auth_section: SettingsSection = {
-        "id": "auth",
-        "title": "Authentication",
-        "description": "Settings for authentication to use Agent Zero Web UI.",
-        "fields": auth_fields,
-        "tab": "external",
-    }
-
-    # api keys model section
-    api_keys_fields: list[SettingsField] = []
-    api_keys_fields.append(_get_api_key_field(settings, "openai", "OpenAI API Key"))
-    api_keys_fields.append(
-        _get_api_key_field(settings, "anthropic", "Anthropic API Key")
-    )
-    api_keys_fields.append(_get_api_key_field(settings, "chutes", "Chutes API Key"))
-    api_keys_fields.append(_get_api_key_field(settings, "deepseek", "DeepSeek API Key"))
-    api_keys_fields.append(_get_api_key_field(settings, "google", "Google API Key"))
-    api_keys_fields.append(_get_api_key_field(settings, "groq", "Groq API Key"))
-    api_keys_fields.append(
-        _get_api_key_field(settings, "huggingface", "HuggingFace API Key")
-    )
-    api_keys_fields.append(
-        _get_api_key_field(settings, "mistralai", "MistralAI API Key")
-    )
-    api_keys_fields.append(
-        _get_api_key_field(settings, "openrouter", "OpenRouter API Key")
-    )
-    api_keys_fields.append(
-        _get_api_key_field(settings, "sambanova", "Sambanova API Key")
-    )
-
-    api_keys_section: SettingsSection = {
-        "id": "api_keys",
-        "title": "API Keys",
-        "description": "API keys for model providers and services used by Agent Zero.",
-        "fields": api_keys_fields,
-        "tab": "external",
-    }
-
-    # Agent config section
+    # agent section
     agent_fields: list[SettingsField] = []
 
     agent_fields.append(
@@ -543,76 +449,107 @@ def convert_out(settings: Settings) -> SettingsOutput:
 
     agent_section: SettingsSection = {
         "id": "agent",
-        "title": "Agent Config",
-        "description": "Agent parameters.",
+        "title": "Agent Settings",
+        "description": "Settings related to the agent's behavior and directories.",
         "fields": agent_fields,
         "tab": "agent",
     }
 
-    dev_fields: list[SettingsField] = []
-
-    if runtime.is_development():
-        # dev_fields.append(
-        #     {
-        #         "id": "rfc_auto_docker",
-        #         "title": "RFC Auto Docker Management",
-        #         "description": "Automatically create dockerized instance of A0 for RFCs using this instance's code base and, settings and .env.",
-        #         "type": "text",
-        #         "value": settings["rfc_auto_docker"],
-        #     }
-        # )
-
-        dev_fields.append(
+    # Search engine section
+    search_engine_section: SettingsSection = {
+        "id": "search_engine",
+        "title": "Search Engine",
+        "fields": [
             {
-                "id": "rfc_url",
-                "title": "RFC Destination URL",
-                "description": "URL of dockerized A0 instance for remote function calls. Do not specify port here.",
-                "type": "text",
-                "value": settings["rfc_url"],
+                "id": "search_engine_provider",
+                "title": "Search engine provider",
+                "description": "Select provider for the search_engine tool",
+                "type": "select",
+                "value": settings["search_engine_provider"],
+                "options": [
+                    {"value": "duckduckgo", "label": "DuckDuckGo"},
+                    {"value": "perplexity", "label": "Perplexity"},
+                ],
             }
-        )
+        ],
+        "tab": "agent",
+    }
 
-    dev_fields.append(
+    # api keys section
+    api_keys_fields: list[SettingsField] = []
+    api_keys_fields.append(_get_api_key_field(settings, "openai", "OpenAI API Key"))
+    api_keys_fields.append(
+        _get_api_key_field(settings, "anthropic", "Anthropic API Key")
+    )
+    api_keys_fields.append(_get_api_key_field(settings, "chutes", "Chutes API Key"))
+    api_keys_fields.append(_get_api_key_field(settings, "deepseek", "DeepSeek API Key"))
+    api_keys_fields.append(_get_api_key_field(settings, "google", "Google API Key"))
+    api_keys_fields.append(_get_api_key_field(settings, "groq", "Groq API Key"))
+    api_keys_fields.append(
+        _get_api_key_field(settings, "huggingface", "HuggingFace API Key")
+    )
+    api_keys_fields.append(
+        _get_api_key_field(settings, "mistralai", "MistralAI API Key")
+    )
+    api_keys_fields.append(
+        _get_api_key_field(settings, "openrouter", "OpenRouter API Key")
+    )
+    api_keys_fields.append(
+        _get_api_key_field(settings, "sambanova", "Sambanova API Key")
+    )
+
+    api_keys_section: SettingsSection = {
+        "id": "api_keys",
+        "title": "API Keys",
+        "description": "API keys for model providers and services used by Agent Zero.",
+        "fields": api_keys_fields,
+        "tab": "api_keys",
+    }
+
+    # basic auth section
+    auth_fields: list[SettingsField] = []
+
+    auth_fields.append(
         {
-            "id": "rfc_password",
-            "title": "RFC Password",
-            "description": "Password for remote function calls. Passwords must match on both instances. RFCs can not be used with empty password.",
+            "id": "auth_login",
+            "title": "UI Login",
+            "description": "Set user name for web UI",
+            "type": "text",
+            "value": dotenv.get_dotenv_value(dotenv.KEY_AUTH_LOGIN) or "",
+        }
+    )
+
+    auth_fields.append(
+        {
+            "id": "auth_password",
+            "title": "UI Password",
+            "description": "Set user password for web UI",
             "type": "password",
             "value": (
                 PASSWORD_PLACEHOLDER
-                if dotenv.get_dotenv_value(dotenv.KEY_RFC_PASSWORD)
+                if dotenv.get_dotenv_value(dotenv.KEY_AUTH_PASSWORD)
                 else ""
             ),
         }
     )
 
-    if runtime.is_development():
-        dev_fields.append(
+    if runtime.is_dockerized():
+        auth_fields.append(
             {
-                "id": "rfc_port_http",
-                "title": "RFC HTTP port",
-                "description": "HTTP port for dockerized instance of A0.",
-                "type": "text",
-                "value": settings["rfc_port_http"],
+                "id": "root_password",
+                "title": "root Password",
+                "description": "Change linux root password in docker container. This password can be used for SSH access. Original password was randomly generated during setup.",
+                "type": "password",
+                "value": "",
             }
         )
 
-        dev_fields.append(
-            {
-                "id": "rfc_port_ssh",
-                "title": "RFC SSH port",
-                "description": "SSH port for dockerized instance of A0.",
-                "type": "text",
-                "value": settings["rfc_port_ssh"],
-            }
-        )
-
-    dev_section: SettingsSection = {
-        "id": "dev",
-        "title": "Development",
-        "description": "Parameters for A0 framework development. RFCs (remote function calls) are used to call functions on another A0 instance. You can develop and debug A0 natively on your local system while redirecting some functions to A0 instance in docker. This is crucial for development as A0 needs to run in standardized environment to support all features.",
-        "fields": dev_fields,
-        "tab": "developer",
+    auth_section: SettingsSection = {
+        "id": "auth",
+        "title": "Authentication",
+        "description": "Settings for authentication to use Agent Zero Web UI.",
+        "fields": auth_fields,
+        "tab": "dev",
     }
 
     # Speech to text section
@@ -770,7 +707,72 @@ def convert_out(settings: Settings) -> SettingsOutput:
         "tab": "mcp",
     }
 
-    # Add the section to the result
+    dev_fields: list[SettingsField] = []
+
+    if runtime.is_development():
+        # dev_fields.append(
+        #     {
+        #         "id": "rfc_auto_docker",
+        #         "title": "RFC Auto Docker Management",
+        #         "description": "Automatically create dockerized instance of A0 for RFCs using this instance's code base and, settings and .env.",
+        #         "type": "text",
+        #         "value": settings["rfc_auto_docker"],
+        #     }
+        # )
+
+        dev_fields.append(
+            {
+                "id": "rfc_url",
+                "title": "RFC Destination URL",
+                "description": "URL of dockerized A0 instance for remote function calls. Do not specify port here.",
+                "type": "text",
+                "value": settings["rfc_url"],
+            }
+        )
+
+    dev_fields.append(
+        {
+            "id": "rfc_password",
+            "title": "RFC Password",
+            "description": "Password for remote function calls. Passwords must match on both instances. RFCs can not be used with empty password.",
+            "type": "password",
+            "value": (
+                PASSWORD_PLACEHOLDER
+                if dotenv.get_dotenv_value(dotenv.KEY_RFC_PASSWORD)
+                else ""
+            ),
+        }
+    )
+
+    if runtime.is_development():
+        dev_fields.append(
+            {
+                "id": "rfc_port_http",
+                "title": "RFC HTTP port",
+                "description": "HTTP port for dockerized instance of A0.",
+                "type": "text",
+                "value": settings["rfc_port_http"],
+            }
+        )
+
+        dev_fields.append(
+            {
+                "id": "rfc_port_ssh",
+                "title": "RFC SSH port",
+                "description": "SSH port for dockerized instance of A0.",
+                "type": "text",
+                "value": settings["rfc_port_ssh"],
+            }
+        )
+
+    dev_section: SettingsSection = {
+        "id": "dev",
+        "title": "Development",
+        "description": "Parameters for A0 framework development. RFCs (remote function calls) are used to call functions on another A0 instance. You can develop and debug A0 natively on your local system while redirecting some functions to A0 instance in docker. This is crucial for development as A0 needs to run in standardized environment to support all features.",
+        "fields": dev_fields,
+        "tab": "dev",
+    }
+
     result: SettingsOutput = {
         "sections": [
             agent_section,
@@ -778,7 +780,7 @@ def convert_out(settings: Settings) -> SettingsOutput:
             util_model_section,
             embed_model_section,
             browser_model_section,
-            # memory_section,
+            search_engine_section,
             stt_section,
             api_keys_section,
             auth_section,
@@ -909,56 +911,57 @@ def _write_sensitive_settings(settings: Settings):
 def get_default_settings() -> Settings:
     from models import ModelProvider
 
-    return Settings(
-        chat_model_provider=ModelProvider.OPENAI.name,
-        chat_model_name="gpt-4.1",
-        chat_model_kwargs={"temperature": "0"},
-        chat_model_ctx_length=100000,
-        chat_model_ctx_history=0.7,
-        chat_model_vision=True,
-        chat_model_rl_requests=0,
-        chat_model_rl_input=0,
-        chat_model_rl_output=0,
-        util_model_provider=ModelProvider.OPENAI.name,
-        util_model_name="gpt-4.1-nano",
-        util_model_ctx_length=100000,
-        util_model_ctx_input=0.7,
-        util_model_kwargs={"temperature": "0"},
-        util_model_rl_requests=0,
-        util_model_rl_input=0,
-        util_model_rl_output=0,
-        embed_model_provider=ModelProvider.HUGGINGFACE.name,
-        embed_model_name="sentence-transformers/all-MiniLM-L6-v2",
-        embed_model_kwargs={},
-        embed_model_rl_requests=0,
-        embed_model_rl_input=0,
-        browser_model_provider=ModelProvider.OPENAI.name,
-        browser_model_name="gpt-4.1",
-        browser_model_vision=True,
-        browser_model_kwargs={"temperature": "0"},
-        api_keys={},
-        auth_login="",
-        auth_password="",
-        root_password="",
-        agent_prompts_subdir="default",
-        agent_memory_subdir="default",
-        agent_knowledge_subdir="custom",
-        rfc_auto_docker=True,
-        rfc_url="localhost",
-        rfc_password="",
-        rfc_port_http=55080,
-        rfc_port_ssh=55022,
-        stt_model_size="base",
-        stt_language="en",
-        stt_silence_threshold=0.3,
-        stt_silence_duration=1000,
-        stt_waiting_timeout=2000,
-        mcp_servers='{\n    "mcpServers": {}\n}',
-        mcp_client_init_timeout=5,
-        mcp_client_tool_timeout=120,
-        mcp_server_enabled=False,
-        mcp_server_token=create_auth_token(),
-    )
+    return {
+        "chat_model_provider": ModelProvider.OPENAI.name,
+        "chat_model_name": "gpt-4-turbo",
+        "chat_model_kwargs": {"temperature": "0.0"},
+        "chat_model_ctx_length": 128000,
+        "chat_model_ctx_history": 0.5,
+        "chat_model_vision": True,
+        "chat_model_rl_requests": 0,
+        "chat_model_rl_input": 0,
+        "chat_model_rl_output": 0,
+        "util_model_provider": ModelProvider.OPENAI.name,
+        "util_model_name": "gpt-3.5-turbo",
+        "util_model_kwargs": {"temperature": "0.0"},
+        "util_model_ctx_length": 16000,
+        "util_model_ctx_input": 0.5,
+        "util_model_rl_requests": 0,
+        "util_model_rl_input": 0,
+        "util_model_rl_output": 0,
+        "embed_model_provider": ModelProvider.OPENAI.name,
+        "embed_model_name": "text-embedding-3-small",
+        "embed_model_kwargs": {},
+        "embed_model_rl_requests": 0,
+        "embed_model_rl_input": 0,
+        "browser_model_provider": "None",
+        "browser_model_name": "None",
+        "browser_model_vision": False,
+        "browser_model_kwargs": {},
+        "search_engine_provider": "duckduckgo",
+        "agent_prompts_subdir": "default",
+        "agent_memory_subdir": "default",
+        "agent_knowledge_subdir": "default",
+        "api_keys": {},
+        "auth_login": "",
+        "auth_password": "",
+        "root_password": "",
+        "rfc_auto_docker": True,
+        "rfc_url": "localhost",
+        "rfc_password": "",
+        "rfc_port_http": 55080,
+        "rfc_port_ssh": 55022,
+        "stt_model_size": "base",
+        "stt_language": "en",
+        "stt_silence_threshold": 0.3,
+        "stt_silence_duration": 1000,
+        "stt_waiting_timeout": 2000,
+        "mcp_servers": '{\n    "mcpServers": {}\n}',
+        "mcp_client_init_timeout": 5,
+        "mcp_client_tool_timeout": 120,
+        "mcp_server_enabled": False,
+        "mcp_server_token": create_auth_token(),
+    }
 
 
 def _apply_settings(previous: Settings | None):
