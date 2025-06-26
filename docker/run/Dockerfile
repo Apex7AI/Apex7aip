@@ -1,35 +1,24 @@
-# Use the pre-built base image for A0
-# FROM agent-zero-base:local
-FROM frdel/agent-zero-base:latest
+# Use a public python image as a base
+FROM python:3.11-slim
 
-# Check if the argument is provided, else throw an error
-ARG BRANCH
-RUN if [ -z "$BRANCH" ]; then echo "ERROR: BRANCH is not set!" >&2; exit 1; fi
-ENV BRANCH=$BRANCH
+# Install git because the application needs it
+RUN apt-get update && apt-get install -y git
 
-# Copy contents of the project to /a0
-COPY ./fs/ /
+# Set the working directory in the container
+WORKDIR /a0
 
-# pre installation steps
-RUN bash /ins/pre_install.sh $BRANCH
+# Add the working directory to PYTHONPATH to resolve imports
+ENV PYTHONPATH=/a0
 
-# install A0
-RUN bash /ins/install_A0.sh $BRANCH
+# Copy the requirements first to leverage Docker cache
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# install additional software
-RUN bash /ins/install_additional.sh $BRANCH
+# Copy the rest of the application code
+COPY . .
 
-# cleanup repo and install A0 without caching, this speeds up builds
-ARG CACHE_DATE=none
-RUN echo "cache buster $CACHE_DATE" && bash /ins/install_A02.sh $BRANCH
+# Expose the internal port that the application runs on
+EXPOSE 80
 
-# post installation steps
-RUN bash /ins/post_install.sh $BRANCH
-
-# Expose ports
-EXPOSE 22 80 9000-9009
-
-RUN chmod +x /exe/initialize.sh /exe/run_A0.sh /exe/run_searxng.sh /exe/run_tunnel_api.sh
-
-# initialize runtime and switch to supervisord
-CMD ["/exe/initialize.sh", "$BRANCH"]
+# The command to run the application
+CMD ["python", "run_ui.py"]

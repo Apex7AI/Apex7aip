@@ -49,6 +49,31 @@ O resultado é um único contêiner estável, previsível e limpo, acessível em
 
 ---
 
+## 26/06/2024: Preparação para o Deploy e a Estratégia do Dockerfile de Produção
+
+**Situação Atual:** Após o sucesso em versionar o projeto no repositório GitHub `Apex7AI/Apex7aip`, o próximo passo lógico é o deploy no EasyPanel.
+
+**Decisão Técnica e Racional:**
+
+O `Dockerfile` presente no repositório (`docker/run/Dockerfile`) era o original do projeto `frdel/agent-zero`, projetado para um processo de build complexo e dependente de scripts (`/ins/*.sh`) e uma imagem base privada. Este `Dockerfile` não é adequado para um deploy limpo e transparente em um ambiente como o EasyPanel.
+
+Para garantir um deploy robusto, previsível e autocontido, decidimos adotar um **`Dockerfile` de produção dedicado**. Este novo `Dockerfile` será o arquivo oficial para builds de produção e seguirá as melhores práticas:
+
+1.  **Base Pública e Leve:** Utilizará a imagem `python:3.11-slim` como base, que é segura, otimizada e mantida pela comunidade.
+2.  **Instalação de Dependências Explícitas:** Instalará o `git` via `apt-get`, uma dependência que identificamos ser necessária durante a depuração. As dependências Python serão instaladas via `pip` a partir do `requirements.txt`.
+3.  **Cópia Integral do Código:** Copiará todo o código-fonte do repositório para o contêiner (`COPY . .`), garantindo que o build use exatamente o que foi versionado.
+4.  **Ponto de Entrada Único e Claro:** Definirá o comando de inicialização `CMD ["python", "run_ui.py"]`, que corresponde à nossa arquitetura de serviço único estabilizada.
+5.  **Exposição de Porta Correta:** Exporá a porta `80`, que é a porta em que a aplicação escuta dentro do contêiner.
+
+Esta abordagem **não afeta o ambiente de desenvolvimento local**. O desenvolvimento continuará usando o `docker-compose.yml`, que utiliza volumes para o "modo rápido", enquanto o EasyPanel usará o novo `Dockerfile` de produção para criar a imagem na nuvem.
+
+**Próximos Passos Imediatos:**
+1. Atualizar este diário de bordo.
+2. Substituir o conteúdo de `docker/run/Dockerfile` pelo novo `Dockerfile` de produção.
+3. Fazer o commit e push desta alteração para o GitHub, deixando o repositório pronto para o deploy.
+
+---
+
 ## Estado Atual e Procedimento de Execução
 
 Com todas as correções aplicadas, temos um ambiente de produção limpo, estável e previsível.
