@@ -129,9 +129,13 @@ Após estabilizar o ambiente local, a próxima fase foi realizar o deploy no Eas
     *   **Causa:** Ambientes gerenciados como o EasyPanel controlam os nomes dos contêineres e o roteamento de portas automaticamente para evitar conflitos.
     *   **Solução:** Removemos as diretivas `container_name` e `ports` do `docker-compose.yml`, delegando esse controle para a plataforma.
 
+5.  **Erro `No such file or directory` na Inicialização:** Após o deploy bem-sucedido, a aplicação não subia, e os logs mostravam um erro em `/exe/run_A0.sh` ao tentar iniciar o SearXNG.
+    *   **Causa:** Nossa configuração com `Supervisor` já inicia o `run_searxng` como um serviço separado. O script `run_A0.sh` (executado pelo serviço `run_ui`) também tentava iniciar o `SearXNG`, causando um conflito e um erro fatal, pois o caminho do executável no ambiente de produção do EasyPanel era diferente.
+    *   **Solução:** Editamos o `run_A0.sh` e comentamos as linhas que tentavam iniciar o `SearXNG` e o `sleep` relacionado, tornando o `Supervisor` a única fonte de verdade para a inicialização de serviços.
+
 ### **IMPORTANTE: Como Restaurar para o Ambiente de Desenvolvimento Local**
 
-A alteração feita para o deploy no EasyPanel **quebra a configuração local** no Docker Desktop, pois o ambiente local depende do arquivo `.env`.
+A alteração feita para o deploy no EasyPanel **quebra a configuração local** no Docker Desktop, pois o ambiente local depende de diretivas específicas no `docker-compose.yml`.
 
 Para voltar a rodar o projeto localmente, é necessário **desfazer o comentário** no arquivo `docker/run/docker-compose.yml`:
 

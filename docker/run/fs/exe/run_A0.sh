@@ -6,11 +6,11 @@
 python /a0/prepare.py --dockerized=true
 python /a0/preload.py --dockerized=true
 
-echo "Starting SearXNG in background..."
-/usr/local/searxng/bin/python /usr/local/searxng/searxng/webapp.py -c /etc/searxng/settings.yml &
+# echo "Starting SearXNG in background..."
+# /usr/local/searxng/bin/python /usr/local/searxng/searxng/webapp.py -c /etc/searxng/settings.yml &
 
-echo "Waiting for SearXNG to initialize..."
-sleep 5
+# echo "Waiting for SearXNG to initialize..."
+# sleep 5
 
 echo "Starting A0..."
 python /a0/run_ui.py \
