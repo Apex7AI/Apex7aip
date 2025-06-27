@@ -21,4 +21,7 @@ COPY . .
 EXPOSE 80
 
 # The command to run the application
-CMD ["python", "run_ui.py"]
+# CMD ["python", "run_ui.py"]
+
+# DEBUG COMMAND: Print all environment variables and keep the container alive
+CMD ["sh", "-c", "echo '--- STARTING DEBUG ---' && printenv && echo '--- DEBUG FINISHED, CONTAINER WILL SLEEP ---' && sleep 3600"]
