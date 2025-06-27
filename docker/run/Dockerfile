@@ -1,27 +1,23 @@
-# Use a public python image as a base
-FROM python:3.11-slim
-
-# Install git because the application needs it
-RUN apt-get update && apt-get install -y git
-
-# Set the working directory in the container
-WORKDIR /a0
-
-# Add the working directory to PYTHONPATH to resolve imports
-ENV PYTHONPATH=/a0
-
-# Copy the requirements first to leverage Docker cache
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the rest of the application code
-COPY . .
-
-# Expose the internal port that the application runs on
-EXPOSE 80
-
-# The command to run the application
-# CMD ["python", "run_ui.py"]
-
-# DEBUG COMMAND: Print all environment variables and keep the container alive
-CMD ["sh", "-c", "echo '--- STARTING DEBUG ---' && printenv && echo '--- DEBUG FINISHED, CONTAINER WILL SLEEP ---' && sleep 3600"]
+    # Use uma imagem base oficial e leve do Python
+    FROM python:3.11-slim
+    
+    # Instale o git, que é uma dependência para o requirements.txt
+    RUN apt-get update && apt-get install -y git
+    
+    # Defina o diretório de trabalho dentro do contêiner
+    WORKDIR /a0
+    
+    # Copie o arquivo de requisitos primeiro para aproveitar o cache do Docker
+    COPY requirements.txt .
+    
+    # Instale as dependências do Python
+    RUN pip install --no-cache-dir -r requirements.txt
+    
+    # Copie todo o código da aplicação para o diretório de trabalho
+    COPY . .
+    
+    # Exponha a porta em que a aplicação vai rodar
+    EXPOSE 80
+    
+    # Defina o comando para iniciar a aplicação
+    CMD ["python", "run_ui.py"]
