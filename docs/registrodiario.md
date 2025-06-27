@@ -92,7 +92,7 @@ docker-compose up -d
 
 O resultado é um único contêiner estável, acessível em `http://localhost:50001`, com os logs normalizados e todas as ferramentas, incluindo o `browser_agent`, prontas para funcionar.
 
----
+-----------------
 ## 25/06/2025: A Caça ao Último Fantasma - O Script de Inicialização
 
 Após estabilizar o ambiente e tomar o controle do `Supervisor`, um último erro crítico surgiu ao tentar usar a ferramenta de busca (`search_engine`): `ConnectionRefusedError: Cannot connect to host localhost:55510`.
@@ -108,3 +108,39 @@ Após estabilizar o ambiente e tomar o controle do `Supervisor`, um último erro
     2.  **Mapeamento do Volume:** A linha `- ./fs/exe/run_A0.sh:/exe/run_A0.sh` foi adicionada ao `docker-compose.yml`, garantindo que nossa versão corrigida do script seja de fato utilizada pelo contêiner.
 
 Esta alteração finaliza o processo de estabilização, resultando em um agente verdadeiramente autocontido e funcional, pronto para os próximos passos. 
+
+---
+
+## 27/06/2024: Deploy no EasyPanel via Docker Compose
+
+Após estabilizar o ambiente local, a próxima fase foi realizar o deploy no EasyPanel, utilizando o método de `Compose` a partir do repositório Git.
+
+**Decisões e Ajustes de Deploy:**
+
+1.  **Caminho de Build:** Durante a configuração no painel do EasyPanel, foi identificado que o caminho de build correto a ser fornecido é `/docker/run` (com a barra no início).
+
+2.  **Visibilidade do Repositório:** O repositório no GitHub precisou ser tornado **Público** para que o EasyPanel pudesse acessá-lo e validar o caminho de build. A alternativa, para repositórios privados, seria configurar uma "Deploy Key" SSH.
+
+3.  **Erro `env file not found`:** A primeira tentativa de deploy falhou com um erro indicando que o arquivo `.env` não foi encontrado.
+    *   **Causa:** Nosso arquivo `docker-compose.yml` continha a diretiva `env_file: - .env`, que instrui o Docker a carregar variáveis de um arquivo `.env` local. Este arquivo não existe no repositório por razões de segurança.
+    *   **Solução:** Modificamos o `docker-compose.yml` e comentamos a diretiva, forçando o EasyPanel a usar as variáveis de ambiente configuradas em sua própria interface gráfica.
+
+### **IMPORTANTE: Como Restaurar para o Ambiente de Desenvolvimento Local**
+
+A alteração feita para o deploy no EasyPanel **quebra a configuração local** no Docker Desktop, pois o ambiente local depende do arquivo `.env`.
+
+Para voltar a rodar o projeto localmente, é necessário **desfazer o comentário** no arquivo `docker/run/docker-compose.yml`:
+
+**Mude isto:**
+```yaml
+    # env_file:
+    #  - .env
+```
+
+**De volta para isto:**
+```yaml
+    env_file:
+      - .env
+```
+
+Esta documentação garante que podemos alternar entre o modo de deploy (EasyPanel) e o modo de desenvolvimento (local) sem perda de configuração. 

@@ -28,5 +28,5 @@ services:
       - TZ=UTC
     working_dir: /a0
     tty: true
-    env_file:
-      - ../../.env
+    # env_file:
+    #  - .env
