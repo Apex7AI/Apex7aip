@@ -1,32 +1,22 @@
 services:
-  agent-zero:
-    image: frdel/agent-zero-run:latest
-    container_name: agent-zero
-    ports:
-      - "50001:80"
-    volumes:
-      - ../../python:/a0/python
-      - ../../webui:/a0/webui
-      - ../../run_ui.py:/a0/run_ui.py
-      - ../../prepare.py:/a0/prepare.py
-      - ../../models.py:/a0/models.py
-      - ../../preload.py:/a0/preload.py
-      - ../../initialize.py:/a0/initialize.py
-      - ../../agent.py:/a0/agent.py
-      - ../../lib:/a0/lib
-      - ./fs/etc/supervisor/conf.d/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
-
-      # Mount persistent data directories
-      - ../../memory:/a0/memory
-      - ../../knowledge:/a0/knowledge
-      - ../../instruments:/a0/instruments
-      - ../../prompts:/a0/prompts
-      - ../../work_dir:/a0/work_dir
-      - ../../tmp:/a0/tmp
+  agent-zero-run:
+    image: agent-zero-run
     restart: unless-stopped
-    environment:
-      - TZ=UTC
+    # env_file:
+    #  - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - BRANCH=main
+    volumes:
+      - ../../prompts:/a0/prompts
+      - ../../knowledge:/a0/knowledge
+      - ../../memory:/a0/memory
+      - ../../tmp:/a0/tmp
+      - ../../work_dir:/a0/work_dir
+      - ./fs/etc/supervisor/conf.d/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
     working_dir: /a0
     tty: true
     # env_file:
-    #  - .env
+    #   - ../../.env

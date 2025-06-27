@@ -125,6 +125,10 @@ Após estabilizar o ambiente local, a próxima fase foi realizar o deploy no Eas
     *   **Causa:** Nosso arquivo `docker-compose.yml` continha a diretiva `env_file: - .env`, que instrui o Docker a carregar variáveis de um arquivo `.env` local. Este arquivo não existe no repositório por razões de segurança.
     *   **Solução:** Modificamos o `docker-compose.yml` e comentamos a diretiva, forçando o EasyPanel a usar as variáveis de ambiente configuradas em sua própria interface gráfica.
 
+4.  **Avisos de `container_name` e `ports`:** O EasyPanel emitiu avisos informando que essas diretivas não deveriam ser usadas.
+    *   **Causa:** Ambientes gerenciados como o EasyPanel controlam os nomes dos contêineres e o roteamento de portas automaticamente para evitar conflitos.
+    *   **Solução:** Removemos as diretivas `container_name` e `ports` do `docker-compose.yml`, delegando esse controle para a plataforma.
+
 ### **IMPORTANTE: Como Restaurar para o Ambiente de Desenvolvimento Local**
 
 A alteração feita para o deploy no EasyPanel **quebra a configuração local** no Docker Desktop, pois o ambiente local depende do arquivo `.env`.
@@ -139,6 +143,9 @@ Para voltar a rodar o projeto localmente, é necessário **desfazer o comentári
 
 **De volta para isto:**
 ```yaml
+    container_name: agent-zero-run
+    ports:
+      - "50001:80"
     env_file:
       - .env
 ```
