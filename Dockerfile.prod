@@ -1,0 +1,46 @@
+# --- Estágio 1: Build Base ---
+# Usamos uma imagem Python 3.11 slim como base limpa e leve.
+FROM python:3.11-slim as builder
+
+# Instala dependências do sistema operacional necessárias.
+# - git: para instalar algumas dependências Python.
+# - ffmpeg: requisito obrigatório da biblioteca `whisper` para processar áudio.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Define o diretório de trabalho padrão dentro do contêiner.
+WORKDIR /app
+
+# Copia apenas o arquivo de requisitos primeiro para aproveitar o cache do Docker.
+COPY requirements.txt .
+
+# Instala todas as dependências Python.
+RUN pip install --no-cache-dir -r requirements.txt
+
+# --- Estágio 2: Imagem Final de Produção ---
+# Começamos de novo da mesma base para manter a imagem final limpa.
+FROM python:3.11-slim
+
+# Novamente, instala as dependências do SO que são necessárias em tempo de execução.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Define o diretório de trabalho.
+WORKDIR /app
+
+# Copia as dependências Python instaladas do estágio de 'builder'.
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copia TODO o código da sua aplicação para o diretório de trabalho.
+# Isso garante que a imagem é 100% autocontida.
+COPY . .
+
+# Expõe a porta 80, que é a porta que a aplicação usa para a UI Web.
+EXPOSE 80
+
+# O comando final que inicia a aplicação.
+# Usamos o `run_ui.py` que, como vimos nos logs, é o ponto de entrada principal.
+CMD ["python", "run_ui.py"] 
