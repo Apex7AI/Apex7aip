@@ -249,3 +249,515 @@ Conforme solicitado, esta seção documenta as falhas do assistente de IA durant
 4. Deploy no EasyPanel usando a imagem
 
 **Estado Técnico:** Sistema totalmente funcional e personalizado, pronto para produção na VPS. 
+
+---
+
+## 02/07/2025: Deploy no EasyPanel - Problema de Acesso ao Docker Hub e Solução
+
+**Situação Atual:** Após completar todas as personalizações e correções do sistema Apex7 AI, iniciamos o processo de deploy no EasyPanel usando a estratégia de imagem pré-construída.
+
+**Problema Encontrado no EasyPanel:**
+
+Ao tentar fazer deploy da imagem `levymartins/apex7aip:v2.0` no EasyPanel, encontramos o seguinte erro:
+
+```
+##########################################
+### Pulling image levymartins/apex7aip:v2.0
+### Wed, 02 Jul 2025 00:47:36 GMT
+##########################################
+
+##########################################
+### Error
+### Wed, 02 Jul 2025 00:47:37 GMT
+##########################################
+
+(HTTP code 404) unexpected - pull access denied for levymartins/apex7aip, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
+```
+
+**Diagnóstico do Problema:**
+- **Causa Raiz:** A imagem `levymartins/apex7aip:v2.0` existe localmente (confirmado por `docker images | grep apex7aip`) mas não foi enviada para o Docker Hub
+- **Verificação Local:** Imagem presente com 12.1GB, criada há 2 horas
+- **Status Docker Hub:** Repositório não existe ou está inacessível publicamente
+
+**Arquitetura de Dados Mapeada:**
+Durante o processo, mapeamos completamente como o Agent Zero gerencia dados:
+
+| Componente | Localização Atual | Função | Migração Futura |
+|------------|------------------|---------|-----------------|
+| **Memórias** | `memory/default/` | Sistema FAISS com embeddings | → Supabase pgvector |
+| **Conhecimento** | `knowledge/default/` | PDFs, docs importados | → Supabase Storage |
+| **Conversas** | `tmp/chats/` | Histórico serializado JSON | → Tabela conversations |
+| **Trabalho** | `work_dir/` | Arquivos gerados pelo agente | → Supabase Storage |
+
+**Capacidades Confirmadas do Sistema:**
+- ✅ Sistema de memória vetorial (FAISS) com 4 áreas: main, fragments, solutions, instruments
+- ✅ Sistema de conhecimento com import automático de PDFs, TXT, MD, CSV, HTML
+- ✅ Persistência de conversas com serialização completa do estado
+- ✅ Processamento de documentos com chunking e embeddings
+- ✅ Sistema de busca híbrido (memória + web via SearXNG)
+
+**Roadmap de Evolução Definido:**
+
+**FASE 1 (AGORA):** Resolver acesso Docker Hub e validar deploy
+**FASE 2:** Migração Supabase (memória + conversas + conhecimento)
+**FASE 3:** Sistema de autenticação e usuários
+**FASE 4:** Melhorias UI/UX (design moderno, ícones, simplificação)
+**FASE 5:** Sistema de pagamento e assinaturas
+
+**Próximas Ações Imediatas:**
+1. **CRÍTICO:** Fazer login no Docker Hub e push da imagem v2.0
+2. Configurar repositório como público no Docker Hub
+3. Retry do deploy no EasyPanel
+4. Configurar volumes para persistência de dados
+5. Validação completa das funcionalidades na nuvem
+
+**Comando Necessário para Resolver:**
+```bash
+docker login
+docker push levymartins/apex7aip:v2.0
+```
+
+**Estado Atual:** Sistema pronto para produção, aguardando apenas resolução do acesso ao Docker Hub para completar o deploy no EasyPanel.
+
+---
+
+## 02/07/2025 - CONTINUAÇÃO: Problema Crítico Identificado - Falta do Git na Imagem
+
+**Situação:** Após resolver o acesso ao Docker Hub com token read & write, a imagem foi baixada com sucesso no EasyPanel, mas o container não iniciava ("Nenhum contêiner em execução encontrado").
+
+**Teste Local Revelou o Problema:**
+Executando `docker run -p 8080:80 levymartins/apex7aip:v2.0` localmente, descobrimos o erro real:
+
+```
+ImportError: Bad git executable.
+The git executable must be specified in one of the following ways:
+    - be included in your $PATH
+    - be set via $GIT_PYTHON_GIT_EXECUTABLE
+    - explicitly set via git.refresh(<full-path-to-git-executable>)
+```
+
+**Causa Raiz Identificada:**
+- O `Dockerfile.prod` usa arquitetura multi-stage (2 estágios)
+- **Estágio 1 (builder):** Instala `git` + `ffmpeg` + dependências Python
+- **Estágio 2 (produção):** Só instala `ffmpeg` - **ESQUECEU o `git`**
+- A aplicação Python precisa do `git` em runtime (arquivo `python/helpers/git.py`)
+
+**Correção Aplicada:**
+Modificado o `Dockerfile.prod` no estágio 2 para incluir `git`:
+
+```dockerfile
+# ANTES (incorreto):
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# DEPOIS (corrigido):
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+**Próximos Passos Necessários:**
+1. **Rebuild da imagem:** `docker build -f Dockerfile.prod -t levymartins/apex7aip:v2.1 .`
+2. **Push para Docker Hub:** `docker push levymartins/apex7aip:v2.1`
+3. **Atualizar EasyPanel:** Usar nova versão v2.1
+4. **Validar funcionamento:** Container deve iniciar corretamente
+
+**Lição Aprendida:**
+- Dockerfiles multi-stage precisam instalar ALL dependências em CADA estágio que as usa
+- Teste local da imagem é essencial antes do deploy
+- Git é dependência runtime, não apenas build-time
+
+**Estado Atual:** Correção aplicada no código, aguardando rebuild e novo deploy. 
+
+---
+
+## 02/07/2025 - CONTINUAÇÃO: Limpeza Crítica do Docker - Liberando 32GB
+
+**Situação Crítica:** Sistema com apenas 5GB livres de 47GB devido ao acúmulo de imagens Docker.
+
+**Problema de Espaço Identificado:**
+```
+ANTES da limpeza:
+- Total Docker: 72GB
+- Disco livre: 5GB (crítico)
+- Imagens: 53.36GB (33.37GB reclaimáveis)
+- Build Cache: 19.56GB (tudo reclaimável)
+```
+
+**Processo de Limpeza Executado:**
+
+**1. Limpeza Geral do Sistema:**
+```bash
+docker system prune -f
+# Resultado: 19.57GB liberados (containers parados + build cache)
+```
+
+**2. Remoção de Imagens Desnecessárias:**
+```bash
+docker rmi levymartins/apex7aip:v1.0      # 9.12GB liberados
+docker rmi agent-zero-run:latest          # 9.12GB liberados
+```
+
+**Resultado Final:**
+```
+DEPOIS da limpeza:
+- Total Docker: 40GB (34.38GB + 5.689GB)
+- Liberado: 32GB
+- Imagens mantidas: 3 (apenas essenciais)
+- Sistema local: Funcionando normalmente
+```
+
+**Imagens Mantidas (estratégia):**
+- ✅ `frdel/agent-zero-run:latest` (9.11GB) - Sistema local funcionando
+- ✅ `levymartins/apex7aip:latest` (12.18GB) - Deploy EasyPanel (com Git)
+- ✅ `levymartins/apex7aip:v2.0` (12.06GB) - Backup funcional
+
+### **BOAS PRÁTICAS DE MANUTENÇÃO DOCKER:**
+
+**🧹 Limpeza Semanal Recomendada:**
+```bash
+# Limpeza básica (segura)
+docker system prune -f
+
+# Limpeza completa (mais agressiva)
+docker system prune -a -f
+
+# Limpeza específica de build cache
+docker builder prune -f
+```
+
+**📊 Monitoramento de Espaço:**
+```bash
+# Verificar uso do Docker
+docker system df
+
+# Listar imagens por tamanho
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+
+# Containers parados (candidatos à remoção)
+docker ps -a --filter "status=exited"
+```
+
+**⚠️ Sobre Build Cache:**
+- **O que é:** Cache de layers intermediários do Docker
+- **Seguro deletar:** SIM - só afeta velocidade de builds futuros
+- **Comando:** `docker builder prune -f`
+- **Economia:** Pode liberar 5-20GB facilmente
+
+**🔄 Rotina de Manutenção Sugerida:**
+1. **Semanal:** `docker system prune -f`
+2. **Mensal:** `docker system prune -a -f` (remove imagens não utilizadas)
+3. **Quando necessário:** `docker builder prune -f`
+
+**💾 Monitoramento de Disco:**
+- **Crítico:** < 10GB livres
+- **Alerta:** < 20GB livres  
+- **Ideal:** > 50GB livres para desenvolvimento
+
+**Estado Atual:** Sistema limpo, 32GB liberados, pronto para continuar desenvolvimento.
+
+---
+
+## 02/07/2025 - ESTRATÉGIA FINAL: Deploy Seguro sem Quebrar Local
+
+**Decisão Crítica Tomada:** [[memory:766477]] NÃO fazer commit da correção da porta no ambiente atual para preservar o sistema local funcionando.
+
+**Problema Identificado na Correção da Porta:**
+- **Arquivo:** `run_ui.py` linha 153
+- **Problema:** `port = 80` (hardcoded)
+- **Correção:** `port = runtime.get_web_ui_port()` (dinâmico)
+- **Risco:** Pode afetar Docker Desktop local
+
+**Estratégia SUPER SEGURA Aprovada:**
+
+### 🛡️ **FASE 1: Ambiente Isolado (Amanhã)**
+1. **Clone em novo local:** `git clone https://github.com/Apex7AI/Apex7aip.git agent-zero-deploy`
+2. **Fazer correção da porta** na cópia isolada
+3. **Testar localmente** antes de qualquer deploy
+4. **NÃO afetar** o ambiente atual funcionando
+
+### ☁️ **FASE 2: Nova VPS Oracle**
+- **Segunda conta Oracle** (gratuita)
+- **VPS 200GB + 24RAM** (mesma configuração)
+- **EasyPanel** instalado do zero
+- **Teste completamente isolado**
+
+### 🔧 **FASE 3: Deploy Controlado**
+- **Variáveis necessárias:**
+  ```
+  API_KEY_OPENAI=sua_chave_openai
+  WEB_UI_PORT=80
+  ```
+- **Imagem base:** `levymartins/apex7aip:latest`
+- **Correção aplicada** apenas na cópia
+
+### 📋 **FASE 4: Backup de Segurança**
+- **Se EasyPanel falhar:** → Coolify na nova VPS
+- **Se tudo falhar:** → Manter local funcionando
+- **Sistema atual:** PRESERVADO E FUNCIONANDO
+
+**Vantagens da Estratégia:**
+- ✅ **Zero risco** para o ambiente local
+- ✅ **Teste isolado** em ambiente real
+- ✅ **Múltiplas alternativas** (EasyPanel → Coolify)
+- ✅ **Preservação total** do que funciona
+- ✅ **Aprendizado seguro** sem perdas
+
+**Próximos Passos:**
+1. **HOJE:** Descansar, sistema está estável
+2. **AMANHÃ:** Implementar estratégia segura
+3. **FUTURO:** Migração gradual se tudo funcionar
+
+**Estado Atual:** 
+- ✅ Local funcionando perfeitamente (localhost:50001)
+- ✅ Imagem corrigida disponível (`levymartins/apex7aip:latest`)
+- ✅ 32GB de espaço liberado
+- ✅ Estratégia segura definida
+- ✅ Zero riscos para produção local
+
+**Filosofia:** "Preserve o que funciona, teste o que pode melhorar"
+
+---
+
+## 05/07/2025: Deploy na VPS Hostinger - Estratégia Docker + Traefik + Portainer
+
+**Situação Atual:** Após estabilizar completamente o Agent Zero local (localhost:50001), iniciamos o deploy profissional na VPS Hostinger usando a stack Docker + Traefik + Portainer.
+
+**Configuração da VPS:**
+- **Provedor:** Hostinger VPS (8GB RAM, 100GB storage, 2vCPU)
+- **Usuário:** levy@srv736022
+- **Docker:** v28.3.1 + Docker Compose v2.38.1
+- **Domínio:** apex7ai.com (DNS no Cloudflare)
+
+**Arquitetura Planejada:**
+```
+Internet → Cloudflare → VPS (Traefik) → Containers
+                           ├── Portainer (gerenciamento)
+                           └── Agent Zero (aplicação)
+```
+
+**Subdomínios Configurados:**
+- `traefik.apex7ai.com` → Dashboard do Traefik
+- `portainer.apex7ai.com` → Interface do Portainer  
+- `agent.apex7ai.com` → Agent Zero (Apex7 AI)
+
+**Credenciais:**
+- **E-mail Cloudflare:** suporteafiliadoslevy@gmail.com
+- **Token Cloudflare:** Configurado para DNS challenge
+- **Imagem Docker:** levymartins/apex7aip:latest (corrigida com Git)
+
+**Progresso do Deploy:**
+
+### **FASE 1: Preparação da VPS ✅**
+- ✅ Sistema Ubuntu atualizado
+- ✅ Docker CE instalado (método oficial)
+- ✅ Docker Compose plugin instalado
+- ✅ Usuário levy adicionado ao grupo docker
+- ✅ Teste hello-world executado com sucesso
+
+### **FASE 2: Estrutura de Diretórios ✅**
+- ✅ Criada estrutura em `/opt/docker-stack/`
+- ✅ Pastas: `traefik/`, `portainer/`, `agent-apex7ai/`
+- ✅ Permissões configuradas para usuário levy
+- ✅ Rede Docker `traefik-network` criada
+
+### **FASE 3: Configuração do Traefik (EM ANDAMENTO)**
+- ⏳ Criar docker-compose.yml do Traefik
+- ⏳ Configurar SSL automático via Cloudflare DNS challenge
+- ⏳ Configurar dashboard com autenticação
+- ⏳ Configurar redirecionamento HTTP → HTTPS
+
+### **FASE 4: Configuração do Portainer (PENDENTE)**
+- ⏳ Criar docker-compose.yml do Portainer
+- ⏳ Conectar à rede traefik-network
+- ⏳ Configurar labels para roteamento via Traefik
+- ⏳ Testar acesso via portainer.apex7ai.com
+
+### **FASE 5: Deploy do Agent Zero (PENDENTE)**
+- ⏳ Criar docker-compose.yml do Agent Zero
+- ⏳ Configurar variáveis de ambiente (OPENAI_API_KEY, WEB_UI_PORT)
+- ⏳ Configurar volumes para persistência (memory, knowledge, work_dir)
+- ⏳ Testar acesso via agent.apex7ai.com
+
+### **FASE 6: Validação e Otimização (PENDENTE)**
+- ⏳ Testar SSL automático em todos os domínios
+- ⏳ Validar funcionamento completo do Agent Zero
+- ⏳ Configurar backup automático dos volumes
+- ⏳ Documentar processo de manutenção
+
+**Vantagens da Estratégia Escolhida:**
+- ✅ **SSL Automático:** Let's Encrypt via Cloudflare DNS challenge
+- ✅ **Gerenciamento Visual:** Portainer para administração
+- ✅ **Escalabilidade:** Fácil adicionar novos serviços
+- ✅ **Segurança:** Apenas portas 80/443 expostas
+- ✅ **Manutenibilidade:** Configuração declarativa via Docker Compose
+
+**Diferencial Técnico:**
+- **Preservação do Ambiente Local:** Sistema local (localhost:50001) mantido intacto
+- **Deploy Isolado:** VPS completamente independente do desenvolvimento
+- **Imagem Otimizada:** Usando levymartins/apex7aip:latest com correções aplicadas
+- **DNS Profissional:** Cloudflare com challenge automático para SSL
+
+**Próximos Passos Imediatos:**
+1. Configurar Traefik com SSL automático
+2. Implementar Portainer para gerenciamento visual
+3. Deploy do Agent Zero com persistência de dados
+4. Testes de validação completa
+
+**Estado Atual:** Infraestrutura base pronta, iniciando configuração dos serviços.
+
+---
+
+## 05/07/2025 - CONTINUAÇÃO: Mudança Crítica de Estratégia - Método Gist Gilberto Toledo
+
+**Situação:** Após várias tentativas com diferentes métodos (DNS challenge, arquivos .toml separados, configurações inline), o usuário encontrou o método comprovado do **Gist do Gilberto Toledo** que é muito superior.
+
+### 🚨 ERROS CRÍTICOS DO ASSISTENTE
+
+**1. Método Desnecessariamente Complexo:**
+- Propus DNS challenge (precisa token Cloudflare) quando tlsChallenge é mais simples
+- Criei configurações inline complexas quando arquivos .toml são mais limpos
+- Não pesquisei métodos comprovados antes de propor soluções
+
+**2. Execução Desorganizada:**
+- Fiquei enviando comandos para o usuário executar em vez de explicar o plano
+- Não li completamente o registro diário antes de agir
+- Propus arquivos separados quando juntos é mais eficiente
+
+**3. Falta de Análise do Estado Atual:**
+- Não mapeei corretamente o que já estava funcionando
+- Não identifiquei que já tínhamos rede criada e estrutura preparada
+- Ignorei tentativas anteriores documentadas no registro
+
+### 📊 ANÁLISE DO ESTADO ATUAL DA VPS
+
+**✅ O QUE JÁ TEMOS (FUNCIONANDO):**
+```bash
+# VPS Hostinger preparada
+- Docker CE v28.3.1 + Docker Compose v2.38.1
+- Usuário levy configurado no grupo docker
+- Sistema Ubuntu atualizado e funcional
+
+# Estrutura de diretórios
+/opt/docker-stack/
+├── traefik/     ← Pasta criada, vazia
+├── portainer/   ← Pasta criada, vazia  
+└── agent-apex7ai/ ← Pasta criada, vazia
+
+# Rede Docker
+- traefik-network criada e funcional
+
+# DNS e Domínio
+- apex7ai.com configurado no Cloudflare
+- Subdomínios planejados: traefik.apex7ai.com, portainer.apex7ai.com, agent.apex7ai.com
+```
+
+**❌ O QUE ESTÁ PROBLEMÁTICO:**
+- Tentativas anteriores com DNS challenge falharam
+- Arquivos .toml criados mas docker-compose.yml inconsistente
+- Portainer com timeout de segurança
+- SSL self-signed por configuração incorreta
+
+### 🎯 NOVO PLANO: Método Gist Gilberto Toledo
+
+**FONTE:** https://gist.github.com/gilbertotoledo/73d3a5c41eae820bde4635bbc04f95a7
+
+**VANTAGENS DO MÉTODO:**
+- ✅ **tlsChallenge:** Mais simples que DNS challenge (não precisa token Cloudflare)
+- ✅ **Arquivos .toml:** Configuração mais limpa que labels inline
+- ✅ **Traefik + Portainer juntos:** Faz sentido lógico, menos arquivos
+- ✅ **Método comprovado:** Gist com 100+ stars, testado e documentado
+- ✅ **Organização superior:** Estrutura mais limpa e manutenível
+
+### 📁 ESTRUTURA FINAL ORGANIZADA
+
+```
+/opt/docker-stack/
+├── traefik/
+│   ├── docker-compose.yml          ← Traefik + Portainer juntos
+│   └── config/
+│       ├── traefik.toml            ← Configuração principal
+│       ├── traefik_dynamic.toml    ← Dashboard e middlewares
+│       └── acme.json               ← Certificados SSL (chmod 600)
+└── agent-apex7ai/
+    └── docker-compose.yml          ← Agent Zero separado
+```
+
+**ARQUIVOS NECESSÁRIOS:**
+1. **docker-compose.yml** (Traefik + Portainer)
+2. **traefik.toml** (configuração principal com tlsChallenge)
+3. **traefik_dynamic.toml** (dashboard com autenticação)
+4. **acme.json** (arquivo vazio com chmod 600)
+5. **docker-compose.yml** do Agent Zero (separado)
+
+### 🔄 MIGRAÇÃO DO ESTADO ATUAL
+
+**FASE 1: Limpeza (Segura)**
+- Remover tentativas anteriores que falharam
+- Manter estrutura de pastas (já está correta)
+- Limpar configurações inconsistentes
+
+**FASE 2: Implementação Nova**
+- Criar arquivos baseados no Gist do Gilberto Toledo
+- Adaptar domínios: `SEU_DOMINIO` → `apex7ai.com`
+- Adaptar caminhos: `/home/docker/` → `/opt/docker-stack/`
+- Gerar senha criptografada com htpasswd
+
+**FASE 3: Execução Controlada**
+- Subir Traefik + Portainer primeiro
+- Testar SSL automático
+- Depois adicionar Agent Zero
+
+### 🛡️ NOVA ABORDAGEM DO ASSISTENTE
+
+**MUDANÇA DE PAPEL:**
+- ❌ **ANTES:** Executor (enviando comandos)
+- ✅ **AGORA:** Planejador/Documentador (explicando estratégia)
+
+**RESPONSABILIDADES:**
+- **USUÁRIO:** Executa comandos, tem controle total
+- **ASSISTENTE:** Explica, documenta, planeja, não executa
+
+### 📋 PRÓXIMOS PASSOS ORGANIZADOS
+
+1. **Limpeza:** Usuário remove configurações anteriores
+2. **Estrutura:** Criar pasta `config/` e arquivo `acme.json`
+3. **Arquivos:** Criar os 4 arquivos baseados no Gist
+4. **Execução:** Subir stack e testar
+5. **Agent Zero:** Adicionar aplicação final
+
+**REGRA CRÍTICA MANTIDA:** [[memory:766477]] Preservar o que funciona, não quebrar ambiente local.
+
+---
+
+Registro Diário – 06/07/2025
+Deploy Profissional: Traefik + Portainer + Agent Zero
+O que já conseguimos:
+✅ Traefik configurado como proxy reverso, com SSL automático (Let's Encrypt) via tlsChallenge, usando arquivos .toml para configuração.
+✅ Portainer rodando como serviço gerenciado pelo Traefik, acessível via subdomínio seguro.
+✅ Estrutura de pastas profissional em /opt/docker-stack/:
+Apply to Dockerfile
+✅ Rede Docker traefik-network criada e funcionando.
+✅ Domínios e subdomínios configurados no Cloudflare (apex7ai.com, traefik.apex7ai.com, portainer.apex7ai.com, agent.apex7ai.com).
+✅ Deploy local do Agent Zero funcionando perfeitamente (Docker Desktop).
+
+---
+
+Registro Diário – 07/07/2025
+Diagnóstico Final: Execução do Agent Zero na VPS
+Situação Atual:
+Após migrar o Agent Zero para a VPS, identificamos que a imagem customizada (levymartins/apex7aip:latest) rodava apenas o processo principal (run_ui.py), sem o supervisor (cérebro) e sem os agentes auxiliares (como o SearXNG para busca web).
+Isso foi confirmado ao acessar o shell do container via Portainer e rodar os comandos ps aux e curl http://localhost:55510, que mostraram:
+Apenas o processo python run_ui.py rodando.
+Nenhum processo do supervisor ou do SearXNG.
+Porta 55510 (SearXNG) inacessível.
+Causa:
+O Dockerfile.prod customizado não estava configurado para instalar e iniciar o supervisor, nem copiar todos os scripts de inicialização necessários.
+Por isso, apenas o chat funcionava, mas buscas web e automações não.
+Solução Imediata:
+Trocar a imagem do compose para a imagem oficial do frdel, que já vem pronta com supervisor e todos os agentes configurados:
+
+---
+

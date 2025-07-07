@@ -154,7 +154,7 @@ def run():
             pass  # Override to suppress request logging
 
     # Get configuration from environment
-    port = 80
+    port = runtime.get_web_ui_port()  # Usar configuração dinâmica da variável WEB_UI_PORT
     host = "0.0.0.0"
     server = None
 

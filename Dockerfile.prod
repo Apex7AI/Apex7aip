@@ -25,6 +25,7 @@ FROM python:3.11-slim
 
 # Novamente, instala as dependências do SO que são necessárias em tempo de execução.
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
